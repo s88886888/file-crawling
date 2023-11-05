@@ -8,7 +8,8 @@ import uuid
 
 from Sqlite3Tool import Sqlite3ToolSql
 
-KEY_PATTERN = r'[a-zA-Z0-9\-\_]{40,}'
+key_pattern = r'[a-zA-Z0-9\-\_]{40,}'
+pattern = r"^(vi_|p_)"
 
 
 def get_current_time():
@@ -25,7 +26,7 @@ def letters(s):
     if s == '':
         return False
     else:
-        if re.match(KEY_PATTERN, s):
+        if re.match(key_pattern, s):
             return True
         else:
             return False
@@ -54,7 +55,7 @@ def check_database():
             if os.path.exists(f"{user_input}"):
                 return user_input
             else:
-                print("输入的路径有误")
+                print("输入的路径有误,请重新运行")
                 time.sleep(3)
                 sys.exit()
     else:
@@ -63,57 +64,65 @@ def check_database():
         sys.exit()
 
 
+def data_pk():
+    with open(output_file.name, 'r') as file_read:
+        lines = file_read.readlines()
+    # 过滤符合规则的行并分组
+    groups = []
+    current_group = []
+    with open(f"./restfulFile/pk_file_{get_current_time()}.txt", 'a', encoding='utf8') as file:
+        for line in lines:
+            if re.match(pattern, line):
+                current_group.append(line.strip())
+                if len(current_group) == 25:
+                    groups.append(current_group)
+                    current_group = []
+            else:
+                file.writelines(line)
+        file.writelines("\n")
+
+        current_group_pk = []
+        for group in groups:
+            val = "".join(group)
+            current_group_pk.append(val)
+
+        for cs in current_group_pk:
+            file.writelines("/pk" + " " + cs + "\n")
+
+        file.writelines("/pk" + " " + "\n".join(current_group) + "\n")
+
+
+# D:\dataKey\ChatExport_2023-10-31 (1)\blg2023-10-31-0113.json
+
 if __name__ == '__main__':
-    # pyinstaller --console --onefile.txt
-    # file_path = './user.config'
-    # if os.path.exists(file_path):
-    #     print("检测配置存在")
-    #     with open(file_path, 'r', encoding='utf8') as file:
-    #         user_config = file.read()
-    # else:
-    #     with open(file_path, 'w', encoding='utf8') as file:
-    #         while True:
-    #             # 获取用户输入
-    #             print(
-    #                 "请选择使用存储的方式：1.mysql(开源，免费，需要安装) 2.⭐sqlite3 (不需要下载安装，人走库还在，一库传三代)")
-    #             user_input = input("请输入内容（输入 'exit' 退出）: ")
-    #             if user_input == 'exit':
-    #                 print("无效输入")
-    #                 break
-    #             else:
-    #                 file.write(user_input + '\n')
-    #                 user_config = user_input
-    #                 break
-    #         file.close()
-    #
-    # if user_config == '1\n':
-    #     db = MysqlTool()
-    # else:
-    #     db = Sqlite3ToolSql()
-    #     # db.crateDataBase()
-
-    # 爬取文件的名称
-    # read_file_path = r'./readFile/blg-2023-10-30-0138.json'
-
     read_file_path = check_database()
     db = Sqlite3ToolSql()
-    db.__init__()
-    with open(read_file_path, 'r', encoding='utf8') as json_file:
-        data = json.load(json_file)['messages']
-        output_file = open(f"./restfulFile/file_{get_current_time()}.txt", 'a', encoding='utf8')
-        for index, value in enumerate(data):
-            if letters(data[index]['text']):
-                keys = re.findall(KEY_PATTERN, data[index]['text'])
-                for key in keys:
-                    sql = f"SELECT file_key, num FROM key_data WHERE file_key = '{key}'"
-                    if len(db.execute(sql, True)) == 0:
-                        sql = insert_key_data(key, db)
-                        output_file.writelines(key + "\n")
-                    else:
-                        sql = update_key_data(key, db)
-                print(f"[{index}/{len(data)}/{int((index / len(data)) * 100)}%]:{sql}")
-        output_file.close()
-    json_file.close()
-    print("已经生成新的数据文件，10秒后自动关闭...")
-    time.sleep(10)
-    db.__exit__()
+    try:
+        db.__init__()
+        with open(read_file_path, 'r', encoding='utf8') as json_file:
+            data = json.load(json_file)['messages']
+            output_file = open(f"./restfulFile/file_{get_current_time()}.txt", 'a', encoding='utf8')
+            for index, value in enumerate(data):
+                if letters(data[index]['text']):
+                    keys = re.findall(key_pattern, data[index]['text'])
+                    for key in keys:
+                        sql = f"SELECT file_key, num FROM key_data WHERE file_key = '{key}'"
+                        if len(db.execute(sql, True)) == 0:
+                            sql = insert_key_data(key, db)
+                            output_file.writelines(key + "\n")
+                        else:
+                            sql = update_key_data(key, db)
+                            output_file.writelines(key + "\n")
+                        print(f"[{index}/{len(data)}/{int((index / len(data)) * 100)}%]:{sql}")
+
+        print("已经生成新的数据文件，10秒后自动关闭...")
+    except Exception as e:
+        print(f"发生错误：{str(e)}")
+    finally:
+        db.__exit__()
+        data_wailk()
+        if 'output_file' in locals():
+            output_file.close()
+        if 'json_file' in locals():
+            json_file.close()
+        time.sleep(1)
