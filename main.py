@@ -64,8 +64,30 @@ def check_database():
         sys.exit()
 
 
-def data_pk():
-    with open(output_file.name, 'r') as file_read:
+def data_wait():
+    db = Sqlite3ToolSql()
+    db.__init__()
+    with open(read_file_path, 'r', encoding='utf8') as json_file:
+        data = json.load(json_file)['messages']
+        output_file = open(f"./restfulFile/file_{get_current_time()}.txt", 'a', encoding='utf8')
+        for index, value in enumerate(data):
+            if letters(data[index]['text']):
+                keys = re.findall(key_pattern, data[index]['text'])
+                for key in keys:
+                    sql = f"SELECT file_key, num FROM key_data WHERE file_key = '{key}'"
+                    if len(db.execute(sql, True)) == 0:
+                        sql = insert_key_data(key, db)
+                        output_file.writelines(key + "\n")
+                    else:
+                        sql = update_key_data(key, db)
+                        output_file.writelines(key + "\n")
+                    print(f"[{index}/{len(data)}/{int((index / len(data)) * 100)}%]:{sql}")
+    output_file.close()
+    return output_file.name
+
+
+def data_pk(output_file_url):
+    with open(output_file_url, 'r') as file_read:
         lines = file_read.readlines()
     # 过滤符合规则的行并分组
     groups = []
@@ -98,31 +120,16 @@ if __name__ == '__main__':
     read_file_path = check_database()
     db = Sqlite3ToolSql()
     try:
-        db.__init__()
-        with open(read_file_path, 'r', encoding='utf8') as json_file:
-            data = json.load(json_file)['messages']
-            output_file = open(f"./restfulFile/file_{get_current_time()}.txt", 'a', encoding='utf8')
-            for index, value in enumerate(data):
-                if letters(data[index]['text']):
-                    keys = re.findall(key_pattern, data[index]['text'])
-                    for key in keys:
-                        sql = f"SELECT file_key, num FROM key_data WHERE file_key = '{key}'"
-                        if len(db.execute(sql, True)) == 0:
-                            sql = insert_key_data(key, db)
-                            output_file.writelines(key + "\n")
-                        else:
-                            sql = update_key_data(key, db)
-                            output_file.writelines(key + "\n")
-                        print(f"[{index}/{len(data)}/{int((index / len(data)) * 100)}%]:{sql}")
-
+        output_file_url = data_wait()
+        data_pk(output_file_url)
         print("已经生成新的数据文件，10秒后自动关闭...")
     except Exception as e:
         print(f"发生错误：{str(e)}")
     finally:
         db.__exit__()
-        data_wailk()
-        if 'output_file' in locals():
-            output_file.close()
-        if 'json_file' in locals():
-            json_file.close()
+        #
+        # if 'output_file' in locals():
+        #     output_file.close()
+        # if 'json_file' in locals():
+        #     json_file.close()
         time.sleep(1)
